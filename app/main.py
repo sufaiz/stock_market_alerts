@@ -23,25 +23,63 @@ st.set_page_config(
 st.title("📈 AI-Powered Stock Tracker")
 
 # Sidebar - Quick Selection & Custom Input
-st.sidebar.header("Select Stock")
+st.sidebar.header("Select Asset")
 
-presets = {
-    "Apple (AAPL)": "AAPL",
-    "Microsoft (MSFT)": "MSFT",
-    "Alphabet (GOOGL)": "GOOGL",
-    "Amazon (AMZN)": "AMZN",
-    "Tesla (TSLA)": "TSLA",
-    "NVIDIA (NVDA)": "NVDA",
-    "Meta (META)": "META",
-    "Custom Ticker...": "CUSTOM",
-}
+asset_class = st.sidebar.selectbox(
+    "Asset Class",
+    ["US Stocks", "Indian Stocks", "Commodities", "Forex Pairs", "Custom Ticker"]
+)
 
-selected_preset = st.sidebar.selectbox("Popular Stocks", list(presets.keys()))
+ticker = "AAPL"  # Default fallback
 
-if presets[selected_preset] == "CUSTOM":
-    ticker = st.sidebar.text_input("Enter Ticker Symbol", value="AAPL").upper().strip()
+if asset_class == "US Stocks":
+    us_presets = {
+        "Apple (AAPL)": "AAPL",
+        "Microsoft (MSFT)": "MSFT",
+        "Alphabet (GOOGL)": "GOOGL",
+        "Amazon (AMZN)": "AMZN",
+        "Tesla (TSLA)": "TSLA",
+        "NVIDIA (NVDA)": "NVDA",
+        "Meta (META)": "META",
+    }
+    selected_us = st.sidebar.selectbox("US Stocks", list(us_presets.keys()))
+    ticker = us_presets[selected_us]
+
+elif asset_class == "Indian Stocks":
+    in_presets = {
+        "Reliance Industries (RELIANCE.NS)": "RELIANCE.NS",
+        "Tata Consultancy Services (TCS.NS)": "TCS.NS",
+        "HDFC Bank (HDFCBANK.NS)": "HDFCBANK.NS",
+        "Infosys (INFY.NS)": "INFY.NS",
+        "ICICI Bank (ICICIBANK.NS)": "ICICIBANK.NS",
+        "State Bank of India (SBIN.NS)": "SBIN.NS",
+    }
+    selected_in = st.sidebar.selectbox("Indian Stocks (NSE)", list(in_presets.keys()))
+    ticker = in_presets[selected_in]
+
+elif asset_class == "Commodities":
+    comm_presets = {
+        "Gold (GC=F)": "GC=F",
+        "Silver (SI=F)": "SI=F",
+        "Crude Oil (CL=F)": "CL=F",
+        "Natural Gas (NG=F)": "NG=F",
+    }
+    selected_comm = st.sidebar.selectbox("Commodities", list(comm_presets.keys()))
+    ticker = comm_presets[selected_comm]
+
+elif asset_class == "Forex Pairs":
+    forex_presets = {
+        "EUR / USD": "EURUSD=X",
+        "GBP / USD": "GBPUSD=X",
+        "USD / JPY": "USDJPY=X",
+        "USD / INR": "USDINR=X",
+    }
+    selected_forex = st.sidebar.selectbox("Forex Pairs", list(forex_presets.keys()))
+    ticker = forex_presets[selected_forex]
+
 else:
-    ticker = presets[selected_preset]
+    ticker = st.sidebar.text_input("Enter Ticker Symbol", value="AAPL").upper().strip()
+
 
 # Timeframe / Interval selection
 st.sidebar.header("Chart Settings")
