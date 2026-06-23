@@ -45,29 +45,65 @@ else:
 
 # Timeframe / Interval selection
 st.sidebar.header("Chart Settings")
-timeframe = st.sidebar.selectbox(
-    "Timeframe",
-    options=[
-        "1 Day (Real-time, 1m)",
-        "5 Days (Intraday, 15m)",
-        "1 Month (Daily)",
-        "6 Months (Daily)",
-        "1 Year (Daily)",
-    ],
-    index=3  # Default to 6 Months
-)
 
-# Map selections to period/interval for yfinance
-if timeframe == "1 Day (Real-time, 1m)":
-    period, interval = "1d", "1m"
-elif timeframe == "5 Days (Intraday, 15m)":
-    period, interval = "5d", "15m"
-elif timeframe == "1 Month (Daily)":
-    period, interval = "1mo", "1d"
-elif timeframe == "6 Months (Daily)":
-    period, interval = "6mo", "1d"
+timeframe_mode = st.sidebar.radio("Timeframe Mode", ["Presets", "Custom Date Range"])
+
+# Initialize values
+period = None
+start_date = None
+end_date = None
+interval = "1d"
+
+if timeframe_mode == "Presets":
+    timeframe = st.sidebar.selectbox(
+        "Timeframe",
+        options=[
+            "1 Day (Real-time, 1m)",
+            "5 Days (Intraday, 15m)",
+            "1 Month (Daily)",
+            "3 Months (Daily)",
+            "6 Months (Daily)",
+            "1 Year (Daily)",
+            "5 Years (Weekly)",
+            "Max (Monthly)",
+        ],
+        index=4  # Default to 6 Months
+    )
+
+    # Map selections to period/interval for yfinance
+    if timeframe == "1 Day (Real-time, 1m)":
+        period, interval = "1d", "1m"
+    elif timeframe == "5 Days (Intraday, 15m)":
+        period, interval = "5d", "15m"
+    elif timeframe == "1 Month (Daily)":
+        period, interval = "1mo", "1d"
+    elif timeframe == "3 Months (Daily)":
+        period, interval = "3mo", "1d"
+    elif timeframe == "6 Months (Daily)":
+        period, interval = "6mo", "1d"
+    elif timeframe == "1 Year (Daily)":
+        period, interval = "1y", "1d"
+    elif timeframe == "5 Years (Weekly)":
+        period, interval = "5y", "1wk"
+    else:
+        period, interval = "max", "1mo"
 else:
-    period, interval = "1y", "1d"
+    import datetime
+    today = datetime.date.today()
+    one_year_ago = today - datetime.timedelta(days=365)
+    
+    start_date = st.sidebar.date_input("Start Date", value=one_year_ago)
+    end_date = st.sidebar.date_input("End Date", value=today)
+    
+    interval = st.sidebar.selectbox(
+        "Interval",
+        options=["1m", "5m", "15m", "1h", "1d", "1wk", "1mo"],
+        index=4  # Default to 1d
+    )
+    
+    # Simple validation
+    if start_date > end_date:
+        st.sidebar.error("Start Date must be before End Date.")
 
 chart_type = st.sidebar.radio("Chart Type", ["Candlestick", "Line"])
 
@@ -79,7 +115,17 @@ if st.sidebar.button("🔄 Refresh Data"):
 st.sidebar.header("Stock Price Alerts")
 
 if ticker:
-    df = get_stock_data(ticker, period=period, interval=interval)
+    # Fetch data based on the mode selected
+    if timeframe_mode == "Presets":
+        df = get_stock_data(ticker, period=period, interval=interval)
+    else:
+        df = get_stock_data(
+            ticker, 
+            interval=interval, 
+            start=start_date.strftime("%Y-%m-%d"), 
+            end=end_date.strftime("%Y-%m-%d")
+        )
+
 
     if df.empty:
         st.error(

@@ -5,21 +5,34 @@ import yfinance as yf
 
 
 def get_stock_data(
-    ticker: str, period: str = "6mo", interval: str = "1d"
+    ticker: str,
+    period: str = None,
+    interval: str = "1d",
+    start: str = None,
+    end: str = None,
 ) -> pd.DataFrame:
     """Fetch historical OHLCV data for a given stock ticker.
 
     Args:
         ticker: The stock ticker symbol (e.g., "AAPL").
-        period: The time period to fetch data for. Defaults to "6mo".
+        period: The time period to fetch data for (e.g., "6mo"). If start/end
+            are provided, period should be None. Defaults to None.
         interval: The data interval. Defaults to "1d".
+        start: Start date string (YYYY-MM-DD) or datetime. Defaults to None.
+        end: End date string (YYYY-MM-DD) or datetime. Defaults to None.
 
     Returns:
         A DataFrame containing historical OHLCV data.
     """
     stock = yf.Ticker(ticker)
-    data = stock.history(period=period, interval=interval)
+    if start or end:
+        data = stock.history(start=start, end=end, interval=interval)
+    else:
+        # If no period and no start/end, default to "6mo"
+        p = period if period is not None else "6mo"
+        data = stock.history(period=p, interval=interval)
     return data
+
 
 
 def get_stock_info(ticker: str) -> dict:
