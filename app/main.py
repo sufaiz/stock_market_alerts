@@ -12,6 +12,7 @@ import datetime
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+from streamlit_autorefresh import st_autorefresh
 
 # Add workspace root to python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -51,6 +52,21 @@ TIMEFRAMES = {
     "W":   ("5y",   "1wk"),    # Weekly candles
     "M":   ("max",  "1mo"),    # Monthly candles
 }
+
+# Interval → milliseconds (for candle countdown timer)
+INTERVAL_MS = {
+    "1m": 60_000, "2m": 120_000, "5m": 300_000,
+    "15m": 900_000, "30m": 1_800_000, "1h": 3_600_000,
+    "1d": 86_400_000, "1wk": 604_800_000, "1mo": 2_592_000_000,
+}
+
+# Auto-refresh rates per interval (ms)
+REFRESH_RATES = {
+    "1m": 5_000, "2m": 5_000, "5m": 10_000,
+    "15m": 15_000, "30m": 30_000, "1h": 60_000,
+}
+
+IS_INTRADAY = {"1m", "2m", "5m", "15m", "30m", "1h"}
 
 
 # ── Premium CSS ──────────────────────────────────────────────────────────────
@@ -275,9 +291,11 @@ def prepare_chart_data(df: pd.DataFrame):
     return candles, volumes, sma20, sma50, rsi_data
 
 
-def render_tv_chart(df, ticker, chart_type="Candlestick"):
+def render_tv_chart(df, ticker, chart_type="Candlestick", interval_str="1d"):
     """Render a TradingView Lightweight Charts component."""
     candles, volumes, sma20, sma50, rsi_data = prepare_chart_data(df)
+    candle_ms = INTERVAL_MS.get(interval_str, 86_400_000)
+    is_live = interval_str in IS_INTRADAY
     has_volume = any(v["value"] > 0 for v in volumes)
 
     html = f"""
@@ -324,6 +342,30 @@ def render_tv_chart(df, ticker, chart_type="Candlestick"):
         }}
         .sma-legend .sma-item {{ display:flex; align-items:center; gap:4px; }}
         .sma-legend .dot {{ width:8px; height:3px; border-radius:1px; }}
+
+        /* Countdown Timer */
+        .countdown-bar {{
+            position:absolute; top:8px; right:12px; z-index:10;
+            display:flex; align-items:center; gap:8px;
+            pointer-events:none;
+        }}
+        .live-dot {{
+            width:7px; height:7px; border-radius:50%;
+            background:#ef5350;
+            animation: pulse 1.5s ease-in-out infinite;
+        }}
+        @keyframes pulse {{
+            0%, 100% {{ opacity:1; box-shadow:0 0 0 0 rgba(239,83,80,0.6); }}
+            50% {{ opacity:0.7; box-shadow:0 0 0 6px rgba(239,83,80,0); }}
+        }}
+        .live-label {{
+            font-size:10px; font-weight:700; color:#ef5350;
+            letter-spacing:0.06em;
+        }}
+        .cd-text {{
+            font-size:11px; color:#787b86; font-weight:600;
+            font-variant-numeric:tabular-nums;
+        }}
     </style>
     </head>
     <body>
@@ -347,6 +389,11 @@ def render_tv_chart(df, ticker, chart_type="Candlestick"):
                     <span style="color:#7b61ff;">SMA 50: <span id="l-sma50">—</span></span>
                 </div>
             </div>
+            <div class="countdown-bar" id="countdown-bar" style="display:{'flex' if is_live else 'none'};">
+                <div class="live-dot"></div>
+                <span class="live-label">LIVE</span>
+                <span class="cd-text" id="cd-timer"></span>
+            </div>
         </div>
         <div id="rsi-container">
             <div class="rsi-legend">
@@ -366,6 +413,8 @@ def render_tv_chart(df, ticker, chart_type="Candlestick"):
         const rsiData    = {json.dumps(rsi_data)};
         const chartType  = "{chart_type}";
         const hasVolume  = {"true" if has_volume else "false"};
+        const candleMs   = {candle_ms};
+        const isLive     = {"true" if is_live else "false"};
 
         // ── Main Chart ──────────────────────────────────────────────
         const mainEl = document.getElementById('main-container');
@@ -691,6 +740,26 @@ def render_tv_chart(df, ticker, chart_type="Candlestick"):
         // Fit content
         mainChart.timeScale().fitContent();
         rsiChart.timeScale().fitContent();
+
+        // ── Candle Countdown Timer ──────────────────────────────────
+        if (isLive) {{
+            const cdEl = document.getElementById('cd-timer');
+            function updateCountdown() {{
+                const now = Date.now();
+                const nextCandle = Math.ceil(now / candleMs) * candleMs;
+                const remaining = Math.max(0, nextCandle - now);
+                const hrs  = Math.floor(remaining / 3600000);
+                const mins = Math.floor((remaining % 3600000) / 60000);
+                const secs = Math.floor((remaining % 60000) / 1000);
+                let txt = '';
+                if (hrs > 0) txt += hrs + ':';
+                txt += (hrs > 0 ? String(mins).padStart(2,'0') : mins) + ':';
+                txt += String(secs).padStart(2, '0');
+                cdEl.textContent = txt;
+            }}
+            updateCountdown();
+            setInterval(updateCountdown, 200);
+        }}
     }})();
     </script>
     </body>
@@ -838,15 +907,43 @@ if ticker:
                     add_alert(ticker, threshold, direction, email)
                     st.success(f"Alert: {ticker} {direction} ${threshold:,.2f}")
 
+        # ── Auto-Refresh for Intraday ─────────────────────────────────
+        is_intraday = interval in IS_INTRADAY
+        if is_intraday:
+            refresh_ms = REFRESH_RATES.get(interval, 10_000)
+            st_autorefresh(interval=refresh_ms, limit=None, key="live_refresh")
+
         # ── Ticker Header ────────────────────────────────────────────
+        live_badge = (
+            '<span style="display:inline-flex; align-items:center; gap:5px; '
+            'background:rgba(239,83,80,0.12); padding:2px 10px; border-radius:4px; '
+            'margin-left:8px;">'
+            '<span style="width:6px;height:6px;border-radius:50%;background:#ef5350;'
+            'animation:pulse 1.5s ease-in-out infinite;"></span>'
+            '<span style="color:#ef5350;font-size:0.7rem;font-weight:700;letter-spacing:0.06em;">'
+            'LIVE</span></span>'
+        ) if is_intraday else ''
+
+        now_str = datetime.datetime.now().strftime("%H:%M:%S")
+        updated_badge = (
+            f'<span style="color:#787b86;font-size:0.7rem;margin-left:8px;">'
+            f'Updated {now_str}</span>'
+        )
+
         st.markdown(
-            f"""<div class="tv-header">
+            f"""<style>@keyframes pulse {{
+                0%,100%{{opacity:1;box-shadow:0 0 0 0 rgba(239,83,80,0.6);}}
+                50%{{opacity:0.7;box-shadow:0 0 0 6px rgba(239,83,80,0);}}
+            }}</style>
+            <div class="tv-header">
                 <span class="tv-symbol">{ticker}</span>
                 <span class="tv-exchange">{asset_class}</span>
                 <span class="tv-price {cls}">${latest_price:,.2f}</span>
                 <span class="tv-change {cls}">
                     {arrow} {abs(price_change):,.2f} ({abs(pct_change):.2f}%)
                 </span>
+                {live_badge}
+                {updated_badge}
             </div>""",
             unsafe_allow_html=True,
         )
@@ -894,7 +991,7 @@ if ticker:
                     st.rerun()
 
         # ── Render Chart ─────────────────────────────────────────────
-        render_tv_chart(df, ticker, st.session_state.chart_type)
+        render_tv_chart(df, ticker, st.session_state.chart_type, interval)
 
         # ── Metric Cards ─────────────────────────────────────────────
         def fmt_vol(v):

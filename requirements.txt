@@ -5,3 +5,4 @@ streamlit
 plotly
 google-generativeai
 python-dotenv
+streamlit-autorefresh
