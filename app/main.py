@@ -32,21 +32,24 @@ st.set_page_config(
 
 # ── Session State Defaults ───────────────────────────────────────────────────
 if "timeframe" not in st.session_state:
-    st.session_state.timeframe = "6M"
+    st.session_state.timeframe = "D"
 if "chart_type" not in st.session_state:
     st.session_state.chart_type = "Candlestick"
 if "custom_range" not in st.session_state:
     st.session_state.custom_range = False
 
+# TradingView-style timeframes: label → (yfinance period, yfinance interval)
+# yfinance limits: 1m→7d max, 2m/5m/15m/30m→60d max, 1h→730d max
 TIMEFRAMES = {
-    "1D":  ("1d",  "1m"),
-    "5D":  ("5d",  "15m"),
-    "1M":  ("1mo", "1d"),
-    "3M":  ("3mo", "1d"),
-    "6M":  ("6mo", "1d"),
-    "1Y":  ("1y",  "1d"),
-    "5Y":  ("5y",  "1wk"),
-    "Max": ("max", "1mo"),
+    "1":   ("5d",   "1m"),     # 1-minute candles
+    "2":   ("60d",  "2m"),     # 2-minute candles
+    "5":   ("60d",  "5m"),     # 5-minute candles
+    "15":  ("60d",  "15m"),    # 15-minute candles
+    "30":  ("60d",  "30m"),    # 30-minute candles
+    "1H":  ("2y",   "1h"),     # 1-hour candles
+    "D":   ("1y",   "1d"),     # Daily candles
+    "W":   ("5y",   "1wk"),    # Weekly candles
+    "M":   ("max",  "1mo"),    # Monthly candles
 }
 
 
