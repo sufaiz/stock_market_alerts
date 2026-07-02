@@ -1,9 +1,11 @@
 """Data handler module for fetching stock market data using yfinance."""
 
 import pandas as pd
+import streamlit as st
 import yfinance as yf
 
 
+@st.cache_data(ttl=300)
 def get_stock_data(
     ticker: str,
     period: str = None,
@@ -35,6 +37,7 @@ def get_stock_data(
 
 
 
+@st.cache_data(ttl=300)
 def get_stock_info(ticker: str) -> dict:
     """Fetch key stock information for a given ticker.
 
@@ -51,7 +54,10 @@ def get_stock_info(ticker: str) -> dict:
     """
     stock = yf.Ticker(ticker)
     info = stock.info
-    keys = ["currentPrice", "dayHigh", "dayLow", "volume", "trailingPE"]
+    keys = [
+        "currentPrice", "dayHigh", "dayLow", "volume", "trailingPE",
+        "shortName", "sector", "industry",
+    ]
     return {key: info.get(key) for key in keys}
 
 
